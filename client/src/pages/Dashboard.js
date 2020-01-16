@@ -111,6 +111,7 @@ class Dashboard extends Component {
         // Key accessor, instructs grid on how to fet individual keys from the data set
         keys={d => d.id}
         // Can be a fixed value or an individual data accessor
+        lockScroll={true}
         heights={400}
         // Number of columns
         columns={this.state.width>640 ? (this.state.width>1080 ? 4 : 2) : 1}>
