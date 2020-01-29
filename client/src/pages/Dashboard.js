@@ -1,5 +1,5 @@
 import React, { Component} from "react";
-import { Col, Row, Container } from "../components/Grid";
+import { Container } from "../components/Grid";
 import { RadiusDropDown } from "../components/RadiusDropDown/index.js"; ///maybe take this out
 import SmallCard from "../components/Small Cards";
 import "../components/RadiusDropDown/style.css"
@@ -7,6 +7,7 @@ import { CategoryButton } from "../components/CategoryButton/index.js"
 import axios from "axios";
 import {Grid} from 'mauerwerk';
 import BigCard from "../components/BigCard";
+
 
 const pass ="cYmchs-D7ks1z6zf7ZmYjUaQA9520b_efKJEruSleDKTTrcIbFohp9JLOHOr186XIPlnC8Sj9dOZRY_QsNyLU0_FgLdsmQXsINQWEBHQdcoLjRc-qfDUJhEhRfYPXnYx"
 let lat='';
@@ -19,11 +20,10 @@ class Dashboard extends Component {
     this.state = {
       error: null,
       isLoading: true,
+      maxdata:[],
       data: [],
-      //distance: "",
-      //showMenu: false,
       name: "all",
-      value: 8046,
+      value: "8046",
       location:false,
       width: window.innerWidth || document.documentElement.clientWidth
     };
@@ -37,26 +37,26 @@ class Dashboard extends Component {
     this.setState({width:window.innerWidth || document.getElementById.clientWidth})
   }
   componentDidMount() {
-    window.addEventListener("resize",this.updateWidth());
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(this.displayLocationInfo);
-      
-    }
-    else{
-      
+    if (!sessionStorage.jwtToken) {
+      this.props.history.push("/");
     }
   
+    window.addEventListener("resize",this.updateWidth());
+    navigator.geolocation?(navigator.geolocation.getCurrentPosition(this.displayLocationInfo)):(console.log("oof1"))
+    this.state.location?(this.searchRes()):(console.log("oof"));
   }
+ 
   displayLocationInfo=position=>{
     lng = position.coords.longitude;
     lat = position.coords.latitude;
+    console.log(lat+","+lng)
     this.setState({
       location:true
     })
     this.searchRes(this.state.value, this.state.name);
   }
   searchRes(name) {
-    axios.get(`${'https://cors-anywhere.herokuapp.com/'}https://api.yelp.com/v3/businesses/search?`, {
+    axios.get(`${(window.location.href.indexOf("localhost")!==-1?'http://localhost:8080/':'https://ride-and-dine-cors.herokuapp.com/')}https://api.yelp.com/v3/businesses/search?`, {
       headers: {
         Authorization: `Bearer ${pass}`
     },
@@ -65,31 +65,51 @@ class Dashboard extends Component {
       longitude: lng,
       rating: 5,
       categories: this.state.name,
-      limit: 8,
+      limit: 50,
       radius: this.state.value,
-      sort_by:"rating",
+      sort_by:"distance",
       term:"food"
     }
     })
     .then((res) => {
       this.setState({
         isLoading: false,
-        data: res.data.businesses,
+        maxdata: res.data.businesses.filter(place=>{
+          for(var i in place.categories){
+            if(place.categories[i].alias=="foodtrucks"||place.categories[i].alias=="convenience"){
+              return false;
+            }
+            
+          }
+          return place
+        }).sort((a,b)=>{
+          return a.rating-b.rating;
+        }),
+        data: res.data.businesses.filter(place=>{
+          for(var i in place.categories){
+            if(place.categories[i].alias=="foodtrucks"||place.categories[i].alias=="convenience"){
+              return false;
+            }
+            
+          }
+          return place;
+        }).sort((a,b)=>{
+          return b.rating-a.rating;
+        }).splice(0,8),
         value: this.state.value,
         name: this.state.name
-      },()=>console.log(this.state))
+      },()=>(console.log(this.state.data)))
     })
 
   }
   
   handleChange = (newValue) => {
-    this.searchRes(newValue)
-    this.setState({ value: newValue } )
+    this.setState({ value: newValue },()=>(this.searchRes(newValue)) )
+    
   }
 
   handleCategoryChange = (newName) => {
-    this.searchRes((newName),
-    this.setState({ name: newName } ))
+    this.setState({ name: newName },()=>(this.searchRes()));
     
   } 
 
@@ -111,14 +131,15 @@ class Dashboard extends Component {
         
         <RadiusDropDown  value={this.state.value} handleChange={this.handleChange} />
         <CategoryButton  name={this.state.name} onClick={this.handleCategoryChange} />
-        
-        <Grid
+        {data.length>0?
+        (<Grid
         className="grid"
         // Arbitrary data, should contain keys, possibly heights, etc.
         data={data}
         // Key accessor, instructs grid on how to fet individual keys from the data set
-        keys={d => d.name}
+        keys={d => d.id}
         // Can be a fixed value or an individual data accessor
+        lockScroll={true}
         heights={400}
         // Number of columns
         columns={this.state.width>640 ? (this.state.width>1080 ? 4 : 2) : 1}>
@@ -127,12 +148,12 @@ class Dashboard extends Component {
          
           <div className="cell">
             {maximized && (
-              <BigCard name={data.name} img={data.image_url} toggle={toggle} id={data.id} />
+              <BigCard name={data.name} img={data.image_url} toggle={toggle} id={data.id} rating={data.rating} phone={[data.display_phone,data.phone]} coordinates={data.coordinates} address={data.location.display_address} />
             )}
             {!maximized && <SmallCard name={data.name} img={data.image_url} toggle={toggle} />}
           </div>
         )}
-      </Grid>
+      </Grid>) : (<div className="notFound">No results found</div>)}
       </Container>
       
     );
